@@ -111,11 +111,14 @@ class Krea2Driver(FamilyDriver):
     def max_blocks_to_swap(self, dit=None):
         return (len(dit.blocks) if dit is not None else self.description.n_blocks) - 2
 
-    def enable_block_swap(self, dit, num_blocks, device, supports_backward=True, h2d_only=None, ring_size=2, use_pinned_memory=True):
+    def enable_block_swap(self, dit, num_blocks, device, supports_backward=True, h2d_only=None, ring_size=2, use_pinned_memory=True, fast_lora_stream=False):
         from fizgig.krea2.offloading import BlockSwapConfig
-        # LoRAStreamOffloader requires frozen base weights: enable H2D-only streaming with double-buffered ring for LoRA
+        # LoRAStreamOffloader requires frozen base weights: enable H2D-only streaming with double-buffered ring when opted in
         is_frozen = not any(p.requires_grad for p in dit.parameters())
-        use_h2d = h2d_only if h2d_only is not None else is_frozen
+        if h2d_only is not None:
+            use_h2d = bool(h2d_only and is_frozen)
+        else:
+            use_h2d = bool(fast_lora_stream and is_frozen)
         cpu_weights = getattr(dit, "_cpu_weight_masters", None) if not supports_backward else None
         dit.enable_block_swap(
             num_blocks,
